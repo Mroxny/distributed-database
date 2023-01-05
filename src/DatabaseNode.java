@@ -29,11 +29,14 @@ class DatabaseNode {
                 try {
                     Socket clientSocket = serverSocket.accept();
                     handleClient(clientSocket);
+                    printMessage(String.valueOf(tcpPort), "Client connected");
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
             }
         }).start();
+
+        printMessage(String.valueOf(tcpPort), "Created new node");
     }
 
     public static void main(String[] args) throws IOException {
@@ -144,6 +147,10 @@ class DatabaseNode {
         }
 
         return responses;
+    }
+
+    public static void printMessage(String sender, String msg){
+        System.out.println("[LOG from: "+sender+"]: "+msg);
     }
 
 }
