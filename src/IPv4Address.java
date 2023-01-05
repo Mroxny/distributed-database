@@ -24,4 +24,8 @@ public class IPv4Address {
     }
 
 
+    @Override
+    public String toString() {
+        return ip+":"+port;
+    }
 }
