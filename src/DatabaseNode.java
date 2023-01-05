@@ -10,8 +10,10 @@ class DatabaseNode {
     private Set<Socket> connections;
     // Server socket to listen for client connections
     private ServerSocket serverSocket;
+    private int tcpPort;
 
     public DatabaseNode(int tcpPort, int key, int value, List<IPv4Address> addresses) throws IOException {
+        this.tcpPort = tcpPort;
         data = new HashMap<>();
         data.put(key, value);
         connections = new HashSet<>();
@@ -29,7 +31,6 @@ class DatabaseNode {
                 try {
                     Socket clientSocket = serverSocket.accept();
                     handleClient(clientSocket);
-                    printMessage(String.valueOf(tcpPort), "Client connected");
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -70,6 +71,9 @@ class DatabaseNode {
 
     // Handles a client connection
     private void handleClient(Socket socket) throws IOException {
+        printMessage(String.valueOf(tcpPort), "Client ["+socket.getPort()+"] connected");
+
+
         BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
         PrintWriter out = new PrintWriter(socket.getOutputStream());
 
@@ -99,6 +103,8 @@ class DatabaseNode {
 
         out.flush();
         socket.close();
+        printMessage(String.valueOf(tcpPort), "Client ["+socket.getPort()+"] disconnected");
+
     }
 
     // Sends a request to all connections and returns the responses
