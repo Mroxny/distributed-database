@@ -11,18 +11,15 @@ class DatabaseNode {
     // Server socket to listen for client connections
     private ServerSocket serverSocket;
 
-    public DatabaseNode(int tcpPort, int key, int value, List<String> addresses) throws IOException {
+    public DatabaseNode(int tcpPort, int key, int value, List<IPv4Address> addresses) throws IOException {
         data = new HashMap<>();
         data.put(key, value);
         connections = new HashSet<>();
         serverSocket = new ServerSocket(tcpPort);
 
         // Connect to other nodes
-        for (String address : addresses) {
-            String[] parts = address.split(":");
-            String host = parts[0];
-            int port = Integer.parseInt(parts[1]);
-            Socket socket = new Socket(host, port);
+        for (IPv4Address address : addresses) {
+            Socket socket = new Socket(address.getIp(), address.getPort());
             connections.add(socket);
         }
 
@@ -44,7 +41,7 @@ class DatabaseNode {
         int tcpPort = 0;
         int key = 0;
         int value = 0;
-        List<String> connections = new ArrayList<>();
+        List<IPv4Address> connections = new ArrayList<>();
 
 
         for(int i=0; i<args.length; i++) {
@@ -59,8 +56,7 @@ class DatabaseNode {
                     break;
                 case "-connect":
                     String[] addressArray = args[++i].split(":");
-                    key = Integer.parseInt(mapArray[0]);
-                    value = Integer.parseInt(mapArray[1]);
+                    connections.add(new IPv4Address(addressArray[0], Integer.parseInt(addressArray[1])));
                     break;
                 default:
                     return;
