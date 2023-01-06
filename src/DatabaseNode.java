@@ -5,7 +5,7 @@ import java.util.*;
 // Class representing a node in the distributed database
 class DatabaseNode {
     // Map to store key-value pairs
-    private Map<Integer, Integer> data;
+    private Data data;
     // Set to store connections to other nodes
     private Set<Socket> connections;
     // Server socket to listen for client connections
@@ -16,8 +16,7 @@ class DatabaseNode {
     public DatabaseNode(int tcpPort, int key, int value, List<IPv4Address> addresses) throws IOException {
         this.tcpPort = tcpPort;
         this.active = true;
-        data = new HashMap<>();
-        data.put(key, value);
+        data = new Data(key, value);
         connections = new HashSet<>();
         serverSocket = new ServerSocket(tcpPort);
 
@@ -90,13 +89,13 @@ class DatabaseNode {
             case "set-value":
                 int setKey = Integer.parseInt(parts[1]);
                 int setValue = Integer.parseInt(parts[2]);
-                data.put(setKey, setValue);
+                data = new Data(setKey, setValue);
                 out.println("OK");
                 break;
             case "get-value":
                 int getKey = Integer.parseInt(parts[1]);
-                if (data.containsKey(getKey)) {
-                    out.println(data.get(getKey));
+                if (data.getKey() == getKey) {
+                    out.println(data.getValue());
                 } else {
                     out.println("ERROR");
                 }
