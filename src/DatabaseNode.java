@@ -10,11 +10,9 @@ class DatabaseNode {
     private Set<Socket> connections;
     // Server socket to listen for client connections
     private ServerSocket serverSocket;
-    private int tcpPort;
     private boolean active;
 
     public DatabaseNode(int tcpPort, int key, int value, List<IPv4Address> addresses) throws IOException {
-        this.tcpPort = tcpPort;
         this.active = true;
         data = new Data(key, value);
         connections = new HashSet<>();
@@ -39,7 +37,7 @@ class DatabaseNode {
             }
         }).start();
 
-        printMessage(String.valueOf(tcpPort), "Created new node");
+        printMessage(String.valueOf(serverSocket.getLocalPort()), "Created new node");
     }
 
     public static void main(String[] args) throws IOException {
@@ -71,9 +69,31 @@ class DatabaseNode {
         DatabaseNode node = new DatabaseNode(tcpPort, key, value, connections);
     }
 
+    public String setValue(int key, int value){
+        if(key == data.getKey()){
+            data.setValue(value);
+            return "OK";
+        }
+        return "ERROR";
+    }
+
+    public String getValue(int key){
+        if(key == data.getKey()){
+            return data.getKey()+":"+data.getValue();
+        }
+        return "ERROR";
+    }
+
+    public String findKey(int key){
+        if(key == data.getKey()){
+            return serverSocket.getLocalSocketAddress()+":"+serverSocket.getLocalPort();
+        }
+        return "ERROR";
+    }
+
     // Handles a client connection
     private void handleClient(Socket socket) throws IOException {
-        printMessage(String.valueOf(tcpPort), "Client ["+socket.getPort()+"] connected");
+        printMessage(String.valueOf(serverSocket.getLocalPort()), "Client ["+socket.getPort()+"] connected");
 
 
         BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
@@ -82,23 +102,38 @@ class DatabaseNode {
         String line = in.readLine();
         String[] parts = line.split(" ");
         String operation = parts[0];
+        String res = "";
+        String[] args = new String[0];
 
-        printMessage(String.valueOf(tcpPort), "Client ["+socket.getPort()+"] requested: "+operation);
+        printMessage(String.valueOf(serverSocket.getLocalPort()), "Client ["+socket.getPort()+"] requested: "+operation);
 
         switch (operation){
             case "set-value":
-                int setKey = Integer.parseInt(parts[1]);
-                int setValue = Integer.parseInt(parts[2]);
-                data = new Data(setKey, setValue);
-                out.println("OK");
+                args = parts[1].split(":");
+                res = setValue(Integer.parseInt(args[0]), Integer.parseInt(args[1]));
+                out.println(res);
                 break;
             case "get-value":
-                int getKey = Integer.parseInt(parts[1]);
-                if (data.getKey() == getKey) {
-                    out.println(data.getValue());
-                } else {
-                    out.println("ERROR");
-                }
+                res = getValue(Integer.parseInt(parts[1]));
+                out.println(res);
+                break;
+            case "find-key":
+                res = findKey(Integer.parseInt(parts[1]));
+                out.println(res);
+                break;
+            case "get-max":
+                res = "MAX";
+                out.println(res);
+                break;
+            case "get-min":
+                res = "MIN";
+                out.println(res);
+                break;
+            case "new-record":
+                args = parts[1].split(":");
+                data = new Data(Integer.parseInt(args[0]),Integer.parseInt(args[1]));
+                res = "OK";
+                out.println(res);
                 break;
             case "terminate":
                 active = false;
@@ -107,7 +142,7 @@ class DatabaseNode {
 
         out.flush();
         socket.close();
-        printMessage(String.valueOf(tcpPort), "Client ["+socket.getPort()+"] disconnected");
+        printMessage(String.valueOf(serverSocket.getLocalPort()), "Client ["+socket.getPort()+"] disconnected");
 
     }
 
