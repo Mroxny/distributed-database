@@ -11,9 +11,11 @@ class DatabaseNode {
     // Server socket to listen for client connections
     private ServerSocket serverSocket;
     private int tcpPort;
+    private boolean active;
 
     public DatabaseNode(int tcpPort, int key, int value, List<IPv4Address> addresses) throws IOException {
         this.tcpPort = tcpPort;
+        this.active = true;
         data = new HashMap<>();
         data.put(key, value);
         connections = new HashSet<>();
@@ -27,7 +29,8 @@ class DatabaseNode {
 
         // Start listening for client connections in a new thread
         new Thread(() -> {
-            while (true) {
+
+            while (active) {
                 try {
                     Socket clientSocket = serverSocket.accept();
                     handleClient(clientSocket);
@@ -81,24 +84,26 @@ class DatabaseNode {
         String[] parts = line.split(" ");
         String operation = parts[0];
 
-        if (operation.equals("set-value")) {
-            int key = Integer.parseInt(parts[1]);
-            int value = Integer.parseInt(parts[2]);
-            data.put(key, value);
-            out.println("OK");
-        } else if (operation.equals("get-value")) {
-            int key = Integer.parseInt(parts[1]);
-            if (data.containsKey(key)) {
-                out.println(data.get(key));
-            } else {
-                out.println("ERROR");
-            }
-        } else {
-            // Handle multi-key request
-            List<String> responses = handleMultiKeyRequest(line);
-            for (String response : responses) {
-                out.println(response);
-            }
+        printMessage(String.valueOf(tcpPort), "Client ["+socket.getPort()+"] requested: "+operation);
+
+        switch (operation){
+            case "set-value":
+                int setKey = Integer.parseInt(parts[1]);
+                int setValue = Integer.parseInt(parts[2]);
+                data.put(setKey, setValue);
+                out.println("OK");
+                break;
+            case "get-value":
+                int getKey = Integer.parseInt(parts[1]);
+                if (data.containsKey(getKey)) {
+                    out.println(data.get(getKey));
+                } else {
+                    out.println("ERROR");
+                }
+                break;
+            case "terminate":
+                active = false;
+
         }
 
         out.flush();
@@ -106,6 +111,7 @@ class DatabaseNode {
         printMessage(String.valueOf(tcpPort), "Client ["+socket.getPort()+"] disconnected");
 
     }
+
 
     // Sends a request to all connections and returns the responses
     private List<String> sendRequest(String request) throws IOException {
@@ -122,38 +128,6 @@ class DatabaseNode {
         return responses;
     }
 
-    // Handles a multi-key request by forwarding it to all connections and returning the responses
-    private List<String> handleMultiKeyRequest(String line) throws IOException {
-        String[] parts = line.split(" ");
-        String operation = parts[0];
-        List<String> responses = new ArrayList<>();
-
-        if (operation.equals("get-values")) {
-            // Forward request to all connections
-            List<String> tempResponses = sendRequest(line);
-
-            // Process responses and add values to list
-            for (String tempResponse : tempResponses) {
-                if (!tempResponse.equals("ERROR")) {
-                    String[] tempParts = tempResponse.split(" ");
-                    responses.addAll(Arrays.asList(tempParts).subList(1, tempParts.length));
-                }
-            }
-        } else if (operation.equals("set-values")) {
-            // Set values in own data
-            for (int i = 1; i < parts.length; i++) {
-                String[] keyValue = parts[i].split(":");
-                int key = Integer.parseInt(keyValue[0]);
-                int value = Integer.parseInt(keyValue[1]);
-                data.put(key, value);
-            }
-
-            // Forward request to all connections
-            responses = sendRequest(line);
-        }
-
-        return responses;
-    }
 
     public static void printMessage(String sender, String msg){
         System.out.println("[LOG from: "+sender+"]: "+msg);
