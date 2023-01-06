@@ -7,37 +7,27 @@ class DatabaseNode {
     // Map to store key-value pairs
     private Data data;
     // Set to store connections to other nodes
-    private Set<Socket> connections;
+    private Set<IPv4Address> connections;
     // Server socket to listen for client connections
-    private ServerSocket serverSocket;
+    private int serverPort;
+    private ServerSocket socketTCP;
+    private DatagramSocket socketUDP;
     private boolean active;
 
-    public DatabaseNode(int tcpPort, int key, int value, List<IPv4Address> addresses) throws IOException {
+    public DatabaseNode(int port, int key, int value, List<IPv4Address> addresses) throws IOException {
+        this.serverPort = port;
         this.active = true;
         data = new Data(key, value);
         connections = new HashSet<>();
-        serverSocket = new ServerSocket(tcpPort);
+        connections.addAll(addresses);
+        socketTCP = new ServerSocket(port);
+        socketUDP = new DatagramSocket(port);
 
-        // Connect to other nodes
-        for (IPv4Address address : addresses) {
-            Socket socket = new Socket(address.getIp(), address.getPort());
-            connections.add(socket);
-        }
+        if(serverPort == 0) serverPort = socketTCP.getLocalPort();
 
-        // Start listening for client connections in a new thread
-        new Thread(() -> {
+        listenForConnections();
 
-            while (active) {
-                try {
-                    Socket clientSocket = serverSocket.accept();
-                    handleClient(clientSocket);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-        }).start();
-
-        printMessage(String.valueOf(serverSocket.getLocalPort()), "Created new node");
+        printMessage(String.valueOf(serverPort), "Created new node");
     }
 
     public static void main(String[] args) throws IOException {
@@ -66,7 +56,7 @@ class DatabaseNode {
                     return;
             }
         }
-        DatabaseNode node = new DatabaseNode(tcpPort, key, value, connections);
+        new DatabaseNode(tcpPort, key, value, connections);
     }
 
     public String setValue(int key, int value){
@@ -74,6 +64,7 @@ class DatabaseNode {
             data.setValue(value);
             return "OK";
         }
+        sendNodeRequest("Hello");
         return "ERROR";
     }
 
@@ -86,14 +77,15 @@ class DatabaseNode {
 
     public String findKey(int key){
         if(key == data.getKey()){
-            return serverSocket.getLocalSocketAddress()+":"+serverSocket.getLocalPort();
+            return socketTCP.getLocalSocketAddress()+":"+socketTCP.getLocalPort();
         }
         return "ERROR";
     }
 
+
     // Handles a client connection
     private void handleClient(Socket socket) throws IOException {
-        printMessage(String.valueOf(serverSocket.getLocalPort()), "Client ["+socket.getPort()+"] connected");
+        printMessage(String.valueOf(serverPort), "Client ["+socket.getPort()+"] connected");
 
 
         BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
@@ -105,7 +97,7 @@ class DatabaseNode {
         String res = "";
         String[] args = new String[0];
 
-        printMessage(String.valueOf(serverSocket.getLocalPort()), "Client ["+socket.getPort()+"] requested: "+operation);
+        printMessage(String.valueOf(serverPort), "Client ["+socket.getPort()+"] requested: "+operation);
 
         switch (operation){
             case "set-value":
@@ -142,24 +134,86 @@ class DatabaseNode {
 
         out.flush();
         socket.close();
-        printMessage(String.valueOf(serverSocket.getLocalPort()), "Client ["+socket.getPort()+"] disconnected");
+        printMessage(String.valueOf(serverPort), "Client ["+socket.getPort()+"] disconnected");
+
+    }
+    // Handles a node connection
+    private void handleNode(DatagramPacket pocket){
+        printMessage(String.valueOf(serverPort), "Node ["+pocket.getPort()+"] connected");
+        printMessage(String.valueOf(serverPort), "Node ["+pocket.getPort()+"] said: "+ new String(pocket.getData()));
+
 
     }
 
-
     // Sends a request to all connections and returns the responses
-    private List<String> sendRequest(String request) throws IOException {
-        List<String> responses = new ArrayList<>();
+    private String sendNodeRequest(String request){
+        String res = "ERROR";
 
-        for (Socket socket : connections) {
-            PrintWriter out = new PrintWriter(socket.getOutputStream());
-            BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            out.println(request);
-            out.flush();
-            responses.add(in.readLine());
+        for (IPv4Address address : connections) {
+            printMessage(String.valueOf(serverPort), "Sending request to: "+address.getPort());
+
+
+            try{
+                byte[] message = request.getBytes();
+
+                // Create a DatagramPacket with the message and the address of the recipient
+                InetAddress ip = InetAddress.getByName(address.getIp());
+                DatagramPacket packet = new DatagramPacket(message, message.length, ip, address.getPort());
+
+                // Send the packet
+                socketUDP.send(packet);
+
+                byte[] buffer = new byte[1024];
+
+                // Create a DatagramPacket to receive the message
+                packet = new DatagramPacket(buffer, buffer.length);
+
+                // Wait for a message to arrive
+                socketUDP.receive(packet);
+
+                message = packet.getData();
+                res = new String(message);
+                if(!res.equals("ERROR")) return res;
+            }
+            catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+
         }
+        return res;
+    }
 
-        return responses;
+    private void listenForConnections(){
+        // Start listening for client connections in a new thread
+        new Thread(() -> {
+            while (active) {
+                try {
+                    Socket newClientSocket = socketTCP.accept();
+                    handleClient(newClientSocket);
+
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }).start();
+
+        new Thread(() -> {
+
+            byte[] buffer = new byte[1024];
+            DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+
+            while (active) {
+                try {
+                    socketUDP.receive(packet);
+                    handleNode(packet);
+
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }).start();
+
+
     }
 
 
