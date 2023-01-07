@@ -9,25 +9,26 @@ class DatabaseNode {
     // Set to store connections to other nodes
     private final List<IPv4Address> connections;
     // Server socket to listen for client connections
-    private int serverPort;
+    private IPv4Address serverAddress;
     private final ServerSocket socketTCP;
+
     private boolean active;
 
     public DatabaseNode(int port, int key, int value, List<IPv4Address> connections) throws IOException {
-        this.serverPort = port;
+        this.serverAddress = new IPv4Address("localhost", port);
         this.active = true;
         this.connections = connections;
 
         data = new Data(key, value);
         socketTCP = new ServerSocket(port);
 
-        if(serverPort == 0) serverPort = socketTCP.getLocalPort();
+        if(serverAddress.getPort() == 0) serverAddress.setPort(socketTCP.getLocalPort());
 
         listenForConnections();
 
-        printMessage(String.valueOf(serverPort), "Created new node");
+        printMessage(String.valueOf(serverAddress.getPort()), "Created new node");
         for(IPv4Address a: connections){
-            String res = sendNodeRequest(a, "add-connection localhost:"+serverPort);
+            String res = sendNodeRequest(a, "add-connection");
             System.out.println(res);
         }
     }
@@ -54,7 +55,7 @@ class DatabaseNode {
 
         String[] msg = line.split("//");
 
-        if(msg[0].equalsIgnoreCase("node")) handleNode(socket, msg[1]);
+        if(msg[0].equalsIgnoreCase("node")) handleNode(socket, msg);
         else handleClient(socket, line);
 
     }
@@ -63,7 +64,7 @@ class DatabaseNode {
     private void handleClient(Socket socket, String line) throws IOException {
         PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
 
-        printMessage(String.valueOf(serverPort), "Client ["+socket.getPort()+"] connected");
+        printMessage(String.valueOf(serverAddress.getPort()), "Client ["+socket.getPort()+"] connected");
 
 
         String[] parts = line.split(" ");
@@ -71,7 +72,7 @@ class DatabaseNode {
         String res = "";
         String[] args = new String[0];
 
-        printMessage(String.valueOf(serverPort), "Client ["+socket.getPort()+"] requested: "+operation);
+        printMessage(String.valueOf(serverAddress.getPort()), "Client ["+socket.getPort()+"] requested: "+operation);
 
         switch (operation){
             case "set-value":
@@ -107,19 +108,23 @@ class DatabaseNode {
         }
 
         socket.close();
-        printMessage(String.valueOf(serverPort), "Client ["+socket.getPort()+"] disconnected");
+        printMessage(String.valueOf(serverAddress.getPort()), "Client ["+socket.getPort()+"] disconnected");
 
     }
     // Handles a node connection
-    private void handleNode(Socket socket, String line) throws IOException {
+    private void handleNode(Socket socket, String[] msg) throws IOException {
         PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
 
-        printMessage(String.valueOf(serverPort), "Node ["+socket.getPort()+"] connected and requested: "+line);
 
-        String[] parts = line.split(" ");
+        IPv4Address sender = new IPv4Address(senderAddressParts[0]);
+        String[] parts = msg[0].split(" ");
         String operation = parts[0];
         String res = "";
         String[] args = new String[0];
+
+        printMessage(String.valueOf(serverAddress.getPort()), "Node ["+socketInfo.getPort()+"] connected and requested: "+line);
+
+
 
         switch (operation){
             case "add-connection":
@@ -157,14 +162,15 @@ class DatabaseNode {
 
     // Sends a request to all connections and returns the responses
     private String sendNodeRequest(IPv4Address address ,String request){
-        printMessage(String.valueOf(serverPort), "Sending \""+request+"\" request to: "+address.getPort());
+        printMessage(String.valueOf(serverAddress.getPort()), "Sending \""+request+"\" request to: "+address.getPort());
         String res;
         Socket socket;
         try{
             socket = new Socket(address.getIp(), address.getPort());
+            System.out.println(socket.getPort());
             PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
             BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            out.println("node//"+request);
+            out.println("node//"+request+"//"+serverAddress);
             // Read and print out the response
             res = in.readLine();
             return res;
