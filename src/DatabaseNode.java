@@ -4,32 +4,30 @@ import java.util.*;
 
 // Class representing a node in the distributed database
 class DatabaseNode {
-    // Map to store key-value pairs
-    private Data data;
-    // Set to store connections to other nodes
-    private final List<IPv4Address> connections;
-    // Server socket to listen for client connections
     private IPv4Address serverAddress;
+    private Data data;
+    private boolean active;
+    private final List<IPv4Address> connections;
+    private List<Integer> idLog;
     private final ServerSocket socketTCP;
 
-    private boolean active;
 
     public DatabaseNode(int port, int key, int value, List<IPv4Address> connections) throws IOException {
         this.serverAddress = new IPv4Address("localhost", port);
+        this.data = new Data(key, value);
         this.active = true;
         this.connections = connections;
-
-        data = new Data(key, value);
-        socketTCP = new ServerSocket(port);
+        this.idLog = new ArrayList<>();
+        this.socketTCP = new ServerSocket(port);
 
         if(serverAddress.getPort() == 0) serverAddress.setPort(socketTCP.getLocalPort());
 
         listenForConnections();
 
         printMessage(String.valueOf(serverAddress.getPort()), "Created new node");
+
         for(IPv4Address a: connections){
-            String res = sendNodeRequest(a, "add-connection");
-            System.out.println(res);
+            sendNodeRequest(a, "add-connection");
         }
     }
 
@@ -116,29 +114,32 @@ class DatabaseNode {
         PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
 
 
-        IPv4Address sender = new IPv4Address(senderAddressParts[0]);
+        IPv4Address sender = new IPv4Address(msg[msg.length-1]);
         String[] parts = msg[0].split(" ");
         String operation = parts[0];
         String res = "";
         String[] args = new String[0];
 
-        printMessage(String.valueOf(serverAddress.getPort()), "Node ["+socketInfo.getPort()+"] connected and requested: "+line);
+        printMessage(String.valueOf(serverAddress.getPort()), "Node ["+sender.getPort()+"] connected and requested: "+msg[1]);
 
 
 
         switch (operation){
             case "add-connection":
-                args = parts[1].split(":");
 
-                IPv4Address toAdd = new IPv4Address(args[0], Integer.parseInt(args[1]));
-                System.out.println(toAdd);
-                connections.add(toAdd);
-                out.println("Added: "+ toAdd);
+                System.out.println(sender);
+                connections.add(sender);
+                out.println("Added: "+ sender);
+                break;
+            case "terminate":
+
+
         }
 
     }
 
     public String setValue(int key, int value){
+        int id = (int) (new Date().getTime()/1000);
         if(key == data.getKey()){
             data.setValue(value);
             return "OK";
@@ -161,7 +162,7 @@ class DatabaseNode {
     }
 
     // Sends a request to all connections and returns the responses
-    private String sendNodeRequest(IPv4Address address ,String request){
+    private String sendNodeRequest(IPv4Address address ,String request, int id){
         printMessage(String.valueOf(serverAddress.getPort()), "Sending \""+request+"\" request to: "+address.getPort());
         String res;
         Socket socket;
@@ -170,7 +171,7 @@ class DatabaseNode {
             System.out.println(socket.getPort());
             PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
             BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            out.println("node//"+request+"//"+serverAddress);
+            out.println("node//"+request+"//"+id+"//"+serverAddress);
             // Read and print out the response
             res = in.readLine();
             return res;
