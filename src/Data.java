@@ -1,6 +1,6 @@
 public class Data {
-    int key;
-    int value;
+    private int key;
+    private int value;
 
     public Data(int key, int value) {
         this.key = key;
