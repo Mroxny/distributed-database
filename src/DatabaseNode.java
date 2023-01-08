@@ -228,29 +228,45 @@ class DatabaseNode {
     }
 
     public String getMax(int value, int id, IPv4Address sender){
-        if(data.getKey() > value) value = data.getValue();
+        if(data.getValue() > value) value = data.getValue();
 
         List<IPv4Address> targets = getTargets(sender);
-        List<IPv4Address> responses = new ArrayList<>();
-        String res = MESSAGE_ERROR;
+        List<String> responses = new ArrayList<>();
+        String res;
         for(IPv4Address a: targets){
             res = sendNodeRequest(a, "get-max "+value,id);
-            if(!res.equals(MESSAGE_ERROR)) responses
+            if(!res.equals(MESSAGE_ERROR)) responses.add(res);
         }
-        return res;
+        
+        for (String s: responses){
+            String[] parts = s.split("//");
+            String[] msg = parts[1].split(" ");
+            String[] args = msg[1].split(":");
+            int newValue = Integer.parseInt(args[1]);
+            if(newValue > value){
+                value = newValue;
+                res = args:
+            }
+        }
+        return String.valueOf(value);
     }
 
-    public String getMin(int key, int id, IPv4Address sender){
-        if(key == data.getKey()){
-            return serverAddress.toString();
-        }
+    public String getMin(int value, int id, IPv4Address sender){
+        if(data.getKey() < value) value = data.getValue();
+
         List<IPv4Address> targets = getTargets(sender);
-        String res = MESSAGE_ERROR;
+        List<String> responses = new ArrayList<>();
         for(IPv4Address a: targets){
-            res = sendNodeRequest(a, "find-key "+key,id);
-            if(!res.equals(MESSAGE_ERROR)) return res;
+            String res = sendNodeRequest(a, "get-min "+value,id);
+            if(!res.equals(MESSAGE_ERROR)) responses.add(res);
         }
-        return res;
+        for (String s: responses){
+            String[] parts = s.split("//");
+            String[] msg = parts[1].split(" ");
+            int newValue = Integer.parseInt(msg[1]);
+            if(newValue < value) value = newValue;
+        }
+        return String.valueOf(value);
     }
 
     public String terminate(int id, IPv4Address sender){
