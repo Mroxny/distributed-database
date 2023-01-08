@@ -27,7 +27,7 @@ class DatabaseNode {
         printMessage(String.valueOf(serverAddress.getPort()), "Created new node");
 
         for(IPv4Address a: connections){
-            sendNodeRequest(a, "add-connection");
+            sendNodeRequest(a, "add-connection",0);
         }
     }
 
@@ -71,19 +71,22 @@ class DatabaseNode {
         String[] args = new String[0];
 
         printMessage(String.valueOf(serverAddress.getPort()), "Client ["+socket.getPort()+"] requested: "+operation);
+        int id = (int) (new Date().getTime()/10000);
+        printMessage(String.valueOf(serverAddress.getPort()), "Session id: "+id);
+
 
         switch (operation){
             case "set-value":
                 args = parts[1].split(":");
-                res = setValue(Integer.parseInt(args[0]), Integer.parseInt(args[1]));
+                res = setValue(Integer.parseInt(args[0]), Integer.parseInt(args[1]),id);
                 out.println(res);
                 break;
             case "get-value":
-                res = getValue(Integer.parseInt(parts[1]));
+                res = getValue(Integer.parseInt(parts[1]), id);
                 out.println(res);
                 break;
             case "find-key":
-                res = findKey(Integer.parseInt(parts[1]));
+                res = findKey(Integer.parseInt(parts[1]), id);
                 out.println(res);
                 break;
             case "get-max":
@@ -102,6 +105,10 @@ class DatabaseNode {
                 break;
             case "terminate":
                 active = false;
+                break;
+            default:
+                out.println("Unknown command");
+                break;
 
         }
 
@@ -132,29 +139,32 @@ class DatabaseNode {
                 out.println("Added: "+ sender);
                 break;
             case "terminate":
-
+                out.println("OK");
+                break;
+            default:
+                out.println(Arrays.toString(msg));
+                break;
 
         }
 
     }
 
-    public String setValue(int key, int value){
-        int id = (int) (new Date().getTime()/1000);
+    public String setValue(int key, int value, int id){
         if(key == data.getKey()){
             data.setValue(value);
             return "OK";
         }
-        return sendNodeRequest(new IPv4Address(connections.get(0).getIp(), connections.get(0).getPort()), "Hello test 1");
+        return sendNodeRequest(new IPv4Address(connections.get(0).getIp(), connections.get(0).getPort()), "Hello test 1",id);
     }
 
-    public String getValue(int key){
+    public String getValue(int key, int id){
         if(key == data.getKey()){
             return data.getKey()+":"+data.getValue();
         }
         return "ERROR";
     }
 
-    public String findKey(int key){
+    public String findKey(int key, int id){
         if(key == data.getKey()){
             return socketTCP.getLocalSocketAddress()+":"+socketTCP.getLocalPort();
         }
