@@ -161,10 +161,15 @@ class DatabaseNode {
     public String setValue(int key, int value, int id, IPv4Address sender){
         if(key == data.getKey()){
             data.setValue(value);
-            return "OK";
+            return MESSAGE_OK;
         }
-
-        return sendNodeRequest(new IPv4Address(connections.get(0).getIp(), connections.get(0).getPort()), "set-value",id);
+        List<IPv4Address> targets = getTargets(sender);
+        String res = MESSAGE_ERROR;
+        for(IPv4Address a: targets){
+            res = sendNodeRequest(a, "set-value",id);
+            if(!res.equals(MESSAGE_ERROR)) return res;
+        }
+        return res;
     }
 
     public String getValue(int key, int id, IPv4Address sender){
@@ -196,15 +201,24 @@ class DatabaseNode {
             res = in.readLine();
             return res;
         } catch (IOException e) {
-            return "ERROR";
+            return MESSAGE_ERROR;
         }
     }
 
     public List<IPv4Address> getTargets(IPv4Address sender){
         List<IPv4Address> list = new ArrayList<>(connections);
-        for(int i = 0;i < list.size() ;i++){
-            
+        if(sender != null){
+            int index = -1;
+            for(int i = 0;i < list.size() ;i++){
+                if(list.get(i).equals(sender)){
+                    index = i;
+                    break;
+                }
+            }
+            if(index >= 0) list.remove(index);
         }
+        return list;
+
     }
 
     public static void printMessage(String sender, String msg){
