@@ -26,7 +26,9 @@ public class IPv4Address {
         this.port = port;
     }
 
-
+    public boolean equals(IPv4Address address){
+        return ip.equals(address.ip) && port == address.port;
+    }
     @Override
     public String toString() {
         return ip+":"+port;
