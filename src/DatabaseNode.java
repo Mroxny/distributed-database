@@ -229,11 +229,13 @@ class DatabaseNode {
 
     public String getMax(int value, int id, IPv4Address sender){
         if(data.getKey() > value) value = data.getValue();
+
         List<IPv4Address> targets = getTargets(sender);
+        List<IPv4Address> responses = new ArrayList<>();
         String res = MESSAGE_ERROR;
         for(IPv4Address a: targets){
-            res = sendNodeRequest(a, "find-key "+key,id);
-            if(!res.equals(MESSAGE_ERROR)) return res;
+            res = sendNodeRequest(a, "get-max "+value,id);
+            if(!res.equals(MESSAGE_ERROR)) responses
         }
         return res;
     }
