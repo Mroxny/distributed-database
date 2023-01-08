@@ -69,24 +69,23 @@ class DatabaseNode {
         String operation = parts[0];
         String res = "";
         String[] args = new String[0];
+        int requestId = (int) (new Date().getTime()/1000);
 
-        printMessage(String.valueOf(serverAddress.getPort()), "Client ["+socket.getPort()+"] requested: "+operation);
-        int id = (int) (new Date().getTime()/10000);
-        printMessage(String.valueOf(serverAddress.getPort()), "Session id: "+id);
+        printMessage(String.valueOf(serverAddress.getPort()), "Client ["+socket.getPort()+"] requested: "+operation+" with id:"+requestId);
 
 
         switch (operation){
             case "set-value":
                 args = parts[1].split(":");
-                res = setValue(Integer.parseInt(args[0]), Integer.parseInt(args[1]),id);
+                res = setValue(Integer.parseInt(args[0]), Integer.parseInt(args[1]),requestId);
                 out.println(res);
                 break;
             case "get-value":
-                res = getValue(Integer.parseInt(parts[1]), id);
+                res = getValue(Integer.parseInt(parts[1]), requestId);
                 out.println(res);
                 break;
             case "find-key":
-                res = findKey(Integer.parseInt(parts[1]), id);
+                res = findKey(Integer.parseInt(parts[1]), requestId);
                 out.println(res);
                 break;
             case "get-max":
@@ -122,6 +121,7 @@ class DatabaseNode {
 
 
         IPv4Address sender = new IPv4Address(msg[msg.length-1]);
+        int requestId = Integer.parseInt(msg[2]);
         String[] parts = msg[0].split(" ");
         String operation = parts[0];
         String res = "";
@@ -154,7 +154,7 @@ class DatabaseNode {
             data.setValue(value);
             return "OK";
         }
-        return sendNodeRequest(new IPv4Address(connections.get(0).getIp(), connections.get(0).getPort()), "Hello test 1",id);
+        return sendNodeRequest(new IPv4Address(connections.get(0).getIp(), connections.get(0).getPort()), "set-value",id);
     }
 
     public String getValue(int key, int id){
