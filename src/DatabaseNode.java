@@ -95,11 +95,11 @@ class DatabaseNode {
                 out.println(res);
                 break;
             case "get-max":
-                res = "MAX";
+                res =  getMax(Integer.MIN_VALUE,requestId,null);
                 out.println(res);
                 break;
             case "get-min":
-                res = "MIN";
+                res = getMin(Integer.MAX_VALUE,requestId,null);
                 out.println(res);
                 break;
             case "new-record":
@@ -109,7 +109,11 @@ class DatabaseNode {
                 out.println(res);
                 break;
             case "terminate":
-                res = terminate(requestId, null);
+                res = terminate(requestId);
+                out.println(res);
+                break;
+            case "get-cons":
+                res = connections.toString();
                 out.println(res);
                 break;
             default:
@@ -160,6 +164,18 @@ class DatabaseNode {
                 res = setValue(Integer.parseInt(args[0]), Integer.parseInt(args[1]),requestId, sender);
                 out.println(res);
                 break;
+            case "get-value":
+                res = getValue(Integer.parseInt(parts[1]),requestId, sender);
+                out.println(res);
+                break;
+            case "get-max":
+                res = getMax(Integer.parseInt(parts[1]),requestId, sender);
+                out.println(res);
+                break;
+            case "get-min":
+                res = getMin(Integer.parseInt(parts[1]),requestId, sender);
+                out.println(res);
+                break;
             case "find-key":
                 res = findKey(Integer.parseInt(parts[1]), requestId, sender);
                 out.println(res);
@@ -196,6 +212,7 @@ class DatabaseNode {
         String res = MESSAGE_ERROR;
         for(IPv4Address a: targets){
             res = sendNodeRequest(a, "set-value "+key+":"+value,id);
+            res = getMessageFromResponse(res);
             if(!res.equals(MESSAGE_ERROR)) return res;
         }
         return res;
@@ -209,6 +226,7 @@ class DatabaseNode {
         String res = MESSAGE_ERROR;
         for(IPv4Address a: targets){
             res = sendNodeRequest(a, "get-value "+key,id);
+            res = getMessageFromResponse(res);
             if(!res.equals(MESSAGE_ERROR)) return res;
         }
         return res;
@@ -222,13 +240,13 @@ class DatabaseNode {
         String res = MESSAGE_ERROR;
         for(IPv4Address a: targets){
             res = sendNodeRequest(a, "find-key "+key,id);
+            res = getMessageFromResponse(res);
             if(!res.equals(MESSAGE_ERROR)) return res;
         }
         return res;
     }
 
     public String getMax(int value, int id, IPv4Address sender){
-        if(data.getValue() > value) value = data.getValue();
 
         List<IPv4Address> targets = getTargets(sender);
         List<String> responses = new ArrayList<>();
@@ -237,39 +255,42 @@ class DatabaseNode {
             res = sendNodeRequest(a, "get-max "+value,id);
             if(!res.equals(MESSAGE_ERROR)) responses.add(res);
         }
-        
+        res = data.toString();
+        responses.add(res);
         for (String s: responses){
-            String[] parts = s.split("//");
-            String[] msg = parts[1].split(" ");
-            String[] args = msg[1].split(":");
+            String[] args = s.split(":");
             int newValue = Integer.parseInt(args[1]);
             if(newValue > value){
                 value = newValue;
-                res = args:
+                res = s;
             }
         }
-        return String.valueOf(value);
+        return res;
     }
 
     public String getMin(int value, int id, IPv4Address sender){
-        if(data.getKey() < value) value = data.getValue();
 
         List<IPv4Address> targets = getTargets(sender);
         List<String> responses = new ArrayList<>();
+        String res;
         for(IPv4Address a: targets){
-            String res = sendNodeRequest(a, "get-min "+value,id);
+            res = sendNodeRequest(a, "get-min "+value,id);
             if(!res.equals(MESSAGE_ERROR)) responses.add(res);
         }
+        res = data.toString();
+        responses.add(res);
         for (String s: responses){
-            String[] parts = s.split("//");
-            String[] msg = parts[1].split(" ");
-            int newValue = Integer.parseInt(msg[1]);
-            if(newValue < value) value = newValue;
+            String[] args = s.split(":");
+            int newValue = Integer.parseInt(args[1]);
+            if(newValue < value){
+                value = newValue;
+                res = s;
+            }
         }
-        return String.valueOf(value);
+        return res;
     }
 
-    public String terminate(int id, IPv4Address sender){
+    public String terminate(int id){
         active = false;
         for(IPv4Address a: connections){
             sendNodeRequest(a, "terminate",id);
@@ -293,6 +314,14 @@ class DatabaseNode {
         } catch (IOException e) {
             return MESSAGE_ERROR;
         }
+    }
+
+    private String getMessageFromResponse(String res){
+        if(res.contains("node//")){
+            String[] parts = res.split("//");
+            return parts[1];
+        }
+        else return res;
     }
 
     public List<IPv4Address> getTargets(IPv4Address sender){
