@@ -6,7 +6,6 @@ public class IPv4Address {
         this.ip = ip;
         this.port = port;
     }
-    
     public IPv4Address(String combined){
         this(combined.split(":")[0], Integer.parseInt(combined.split(":")[1]));
     }
