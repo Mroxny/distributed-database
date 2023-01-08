@@ -4,6 +4,10 @@ import java.util.*;
 
 // Class representing a node in the distributed database
 class DatabaseNode {
+    public static String MESSAGE_OK = "OK";
+    public static String MESSAGE_ERROR = "ERROR";
+
+
     private IPv4Address serverAddress;
     private Data data;
     private boolean active;
@@ -77,15 +81,15 @@ class DatabaseNode {
         switch (operation){
             case "set-value":
                 args = parts[1].split(":");
-                res = setValue(Integer.parseInt(args[0]), Integer.parseInt(args[1]),requestId);
+                res = setValue(Integer.parseInt(args[0]), Integer.parseInt(args[1]),requestId, null);
                 out.println(res);
                 break;
             case "get-value":
-                res = getValue(Integer.parseInt(parts[1]), requestId);
+                res = getValue(Integer.parseInt(parts[1]), requestId, null);
                 out.println(res);
                 break;
             case "find-key":
-                res = findKey(Integer.parseInt(parts[1]), requestId);
+                res = findKey(Integer.parseInt(parts[1]), requestId, null);
                 out.println(res);
                 break;
             case "get-max":
@@ -99,8 +103,7 @@ class DatabaseNode {
             case "new-record":
                 args = parts[1].split(":");
                 data = new Data(Integer.parseInt(args[0]),Integer.parseInt(args[1]));
-                res = "OK";
-                out.println(res);
+                out.println(MESSAGE_OK);
                 break;
             case "terminate":
                 active = false;
@@ -127,9 +130,15 @@ class DatabaseNode {
         String res = "";
         String[] args = new String[0];
 
-        printMessage(String.valueOf(serverAddress.getPort()), "Node ["+sender.getPort()+"] connected and requested: "+msg[1]);
+        printMessage(String.valueOf(serverAddress.getPort()), "Node ["+sender.getPort()+"] connected and requested: "+msg[1]+" with id: "+requestId);
 
+        if(idLog.contains(requestId)){
+            printMessage(String.valueOf(serverAddress.getPort()), "Request: "+msg[1]+" with id: "+requestId+"have been used already");
+            out.println(MESSAGE_ERROR);
+            return;
+        }
 
+        idLog.add(requestId);
 
         switch (operation){
             case "add-connection":
@@ -149,22 +158,23 @@ class DatabaseNode {
 
     }
 
-    public String setValue(int key, int value, int id){
+    public String setValue(int key, int value, int id, IPv4Address sender){
         if(key == data.getKey()){
             data.setValue(value);
             return "OK";
         }
+
         return sendNodeRequest(new IPv4Address(connections.get(0).getIp(), connections.get(0).getPort()), "set-value",id);
     }
 
-    public String getValue(int key, int id){
+    public String getValue(int key, int id, IPv4Address sender){
         if(key == data.getKey()){
             return data.getKey()+":"+data.getValue();
         }
         return "ERROR";
     }
 
-    public String findKey(int key, int id){
+    public String findKey(int key, int id, IPv4Address sender){
         if(key == data.getKey()){
             return socketTCP.getLocalSocketAddress()+":"+socketTCP.getLocalPort();
         }
@@ -187,6 +197,13 @@ class DatabaseNode {
             return res;
         } catch (IOException e) {
             return "ERROR";
+        }
+    }
+
+    public List<IPv4Address> getTargets(IPv4Address sender){
+        List<IPv4Address> list = new ArrayList<>(connections);
+        for(int i = 0;i < list.size() ;i++){
+            
         }
     }
 
