@@ -33,7 +33,7 @@ class DatabaseNode {
         printMessage(String.valueOf(serverAddress.getPort()), "Created new node");
 
         for(IPv4Address a: connections){
-            sendNodeRequest(a, "add-connection",-1);
+            sendNodeRequest(a, Collections.singletonList(serverAddress), "add-connection",-1);
         }
     }
 
@@ -75,7 +75,10 @@ class DatabaseNode {
         String operation = parts[0];
         String res = "";
         String[] args = new String[0];
-        int requestId = (int) (new Date().getTime()/1000);
+        int requestId = (int) (new Date().getTime()/100);
+
+        List<IPv4Address> trace = new ArrayList<>();
+        trace.add(serverAddress);
 
         printMessage(String.valueOf(serverAddress.getPort()), "Client ["+socket.getPort()+"] requested: "+operation+" with id:"+requestId);
 
@@ -83,23 +86,23 @@ class DatabaseNode {
         switch (operation){
             case "set-value":
                 args = parts[1].split(":");
-                res = setValue(Integer.parseInt(args[0]), Integer.parseInt(args[1]),requestId, null);
+                res = setValue(Integer.parseInt(args[0]), Integer.parseInt(args[1]),requestId, null, trace);
                 out.println(res);
                 break;
             case "get-value":
-                res = getValue(Integer.parseInt(parts[1]), requestId, null);
+                res = getValue(Integer.parseInt(parts[1]), requestId, null, trace);
                 out.println(res);
                 break;
             case "find-key":
-                res = findKey(Integer.parseInt(parts[1]), requestId, null);
+                res = findKey(Integer.parseInt(parts[1]), requestId, null, trace);
                 out.println(res);
                 break;
             case "get-max":
-                res =  getMax(Integer.MIN_VALUE,requestId,null);
+                res =  getMax(Integer.MIN_VALUE,requestId,null, trace);
                 out.println(res);
                 break;
             case "get-min":
-                res = getMin(Integer.MAX_VALUE,requestId,null);
+                res = getMin(Integer.MAX_VALUE,requestId,null, trace);
                 out.println(res);
                 break;
             case "new-record":
@@ -136,13 +139,17 @@ class DatabaseNode {
 
 
         IPv4Address sender = new IPv4Address(msg[msg.length-1]);
+        List<IPv4Address> trace = getTrace(msg[msg.length-2]);
+        trace.add(serverAddress);
+
         int requestId = Integer.parseInt(msg[2]);
         String[] parts = msg[1].split(" ");
         String operation = parts[0];
         String res = "";
         String[] args = new String[0];
 
-        printMessage(String.valueOf(serverAddress.getPort()), "Node ["+sender.getPort()+"] connected and requested: "+msg[1]+" with id: "+requestId);
+        printMessage(String.valueOf(serverAddress.getPort()), "Node ["+sender.getPort()+"] connected and requested: "+msg[1]+" with id: "+requestId );
+
 
         if(idLog.contains(requestId)){
             printMessage(String.valueOf(serverAddress.getPort()), "Request: "+msg[1]+" with id: "+requestId+"have been used already");
@@ -161,30 +168,30 @@ class DatabaseNode {
                 break;
             case "set-value":
                 args = parts[1].split(":");
-                res = setValue(Integer.parseInt(args[0]), Integer.parseInt(args[1]),requestId, sender);
+                res = setValue(Integer.parseInt(args[0]), Integer.parseInt(args[1]),requestId, sender,trace);
                 out.println(res);
                 break;
             case "get-value":
-                res = getValue(Integer.parseInt(parts[1]),requestId, sender);
+                res = getValue(Integer.parseInt(parts[1]),requestId, sender,trace);
                 out.println(res);
                 break;
             case "get-max":
-                res = getMax(Integer.parseInt(parts[1]),requestId, sender);
+                res = getMax(Integer.parseInt(parts[1]),requestId, sender,trace);
                 out.println(res);
                 break;
             case "get-min":
-                res = getMin(Integer.parseInt(parts[1]),requestId, sender);
+                res = getMin(Integer.parseInt(parts[1]),requestId, sender,trace);
                 out.println(res);
                 break;
             case "find-key":
-                res = findKey(Integer.parseInt(parts[1]), requestId, sender);
+                res = findKey(Integer.parseInt(parts[1]), requestId, sender,trace);
                 out.println(res);
                 break;
             case "terminate":
                 for(int i = 0;i < connections.size() ;i++){
                     if(connections.get(i).equals(sender)){
                         connections.remove(i);
-                        break;
+                        i--;
                     }
                 }
                 printMessage(String.valueOf(serverAddress.getPort()), "Connections left:"+ connections);
@@ -203,7 +210,7 @@ class DatabaseNode {
         socket.close();
     }
 
-    public String setValue(int key, int value, int id, IPv4Address sender){
+    public String setValue(int key, int value, int id, IPv4Address sender, List<IPv4Address> trace){
         if(key == data.getKey()){
             data.setValue(value);
             return MESSAGE_OK;
@@ -211,49 +218,59 @@ class DatabaseNode {
         List<IPv4Address> targets = getTargets(sender);
         String res = MESSAGE_ERROR;
         for(IPv4Address a: targets){
-            res = sendNodeRequest(a, "set-value "+key+":"+value,id);
-            res = getMessageFromResponse(res);
-            if(!res.equals(MESSAGE_ERROR)) return res;
+            if(!trace.toString().contains(a.toString())){
+                res = sendNodeRequest(a, trace,"set-value "+key+":"+value,id);
+                res = getMessageFromResponse(res);
+                if(!res.equals(MESSAGE_ERROR)) return res;
+            }
         }
         return res;
     }
 
-    public String getValue(int key, int id, IPv4Address sender){
+    public String getValue(int key, int id, IPv4Address sender, List<IPv4Address> trace){
         if(key == data.getKey()){
             return data.getKey()+":"+data.getValue();
         }
         List<IPv4Address> targets = getTargets(sender);
+
         String res = MESSAGE_ERROR;
         for(IPv4Address a: targets){
-            res = sendNodeRequest(a, "get-value "+key,id);
-            res = getMessageFromResponse(res);
-            if(!res.equals(MESSAGE_ERROR)) return res;
+            if(!trace.toString().contains(a.toString())){
+                res = sendNodeRequest(a, trace,"get-value "+key,id);
+                if(!res.equals(MESSAGE_ERROR)) return res;
+            }
+
         }
         return res;
     }
 
-    public String findKey(int key, int id, IPv4Address sender){
+    public String findKey(int key, int id, IPv4Address sender, List<IPv4Address> trace){
         if(key == data.getKey()){
             return serverAddress.toString();
         }
         List<IPv4Address> targets = getTargets(sender);
         String res = MESSAGE_ERROR;
         for(IPv4Address a: targets){
-            res = sendNodeRequest(a, "find-key "+key,id);
-            res = getMessageFromResponse(res);
-            if(!res.equals(MESSAGE_ERROR)) return res;
+            if(!trace.toString().contains(a.toString())){
+                res = sendNodeRequest(a, trace, "find-key "+key,id);
+                if(!res.equals(MESSAGE_ERROR)) return res;
+            }
+
         }
         return res;
     }
 
-    public String getMax(int value, int id, IPv4Address sender){
+    public String getMax(int value, int id, IPv4Address sender, List<IPv4Address> trace){
 
         List<IPv4Address> targets = getTargets(sender);
         List<String> responses = new ArrayList<>();
         String res;
         for(IPv4Address a: targets){
-            res = sendNodeRequest(a, "get-max "+value,id);
-            if(!res.equals(MESSAGE_ERROR)) responses.add(res);
+            if(!trace.toString().contains(a.toString())){
+                res = sendNodeRequest(a, trace, "get-max "+value,id);
+                if(!res.equals(MESSAGE_ERROR)) responses.add(res);
+            }
+
         }
         res = data.toString();
         responses.add(res);
@@ -268,14 +285,16 @@ class DatabaseNode {
         return res;
     }
 
-    public String getMin(int value, int id, IPv4Address sender){
+    public String getMin(int value, int id, IPv4Address sender, List<IPv4Address> trace){
 
         List<IPv4Address> targets = getTargets(sender);
         List<String> responses = new ArrayList<>();
         String res;
         for(IPv4Address a: targets){
-            res = sendNodeRequest(a, "get-min "+value,id);
-            if(!res.equals(MESSAGE_ERROR)) responses.add(res);
+            if(!trace.toString().contains(a.toString())){
+                res = sendNodeRequest(a, trace,"get-min "+value,id);
+                if(!res.equals(MESSAGE_ERROR)) responses.add(res);
+            }
         }
         res = data.toString();
         responses.add(res);
@@ -293,13 +312,13 @@ class DatabaseNode {
     public String terminate(int id){
         active = false;
         for(IPv4Address a: connections){
-            sendNodeRequest(a, "terminate",id);
+            sendNodeRequest(a, Collections.singletonList(serverAddress), "terminate",id);
         }
         return MESSAGE_OK;
     }
 
     // Sends a request to all connections and returns the responses
-    private String sendNodeRequest(IPv4Address address ,String request, int id){
+    private String sendNodeRequest(IPv4Address address,List<IPv4Address> owner ,String request, int id){
         printMessage(String.valueOf(serverAddress.getPort()), "Sending \""+request+"\" request to: "+address.getPort());
         String res;
         Socket socket;
@@ -307,7 +326,7 @@ class DatabaseNode {
             socket = new Socket(address.getIp(), address.getPort());
             PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
             BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            out.println("node//"+request+"//"+id+"//"+serverAddress);
+            out.println("node//"+request+"//"+id+"//"+owner+"//"+serverAddress);
             // Read and print out the response
             res = in.readLine();
             return res;
@@ -324,17 +343,24 @@ class DatabaseNode {
         else return res;
     }
 
+    private List<IPv4Address> getTrace(String s){
+        s = s.replace("[", "").replace("]", "");
+        String[] parts = s.split(", ");
+        List<IPv4Address> addresses = new ArrayList<>();
+        for(String a: parts) addresses.add(new IPv4Address(a));
+        return addresses;
+    }
+
     public List<IPv4Address> getTargets(IPv4Address sender){
         List<IPv4Address> list = new ArrayList<>(connections);
         if(sender != null){
-            int index = -1;
             for(int i = 0;i < list.size() ;i++){
                 if(list.get(i).equals(sender)){
-                    index = i;
-                    break;
+                    list.remove(i);
+                    i--;
                 }
+
             }
-            if(index >= 0) list.remove(index);
         }
         return list;
 
@@ -372,6 +398,7 @@ class DatabaseNode {
             }
         }
         new DatabaseNode(tcpPort, key, value, connections);
+
     }
 
 }
