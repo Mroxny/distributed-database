@@ -152,7 +152,7 @@ class DatabaseNode {
 
 
         if(idLog.contains(requestId)){
-            printMessage(String.valueOf(serverAddress.getPort()), "Request: "+msg[1]+" with id: "+requestId+"have been used already");
+            printMessage(String.valueOf(serverAddress.getPort()), "Request: "+msg[1]+" with id: "+requestId+" have been used already");
             out.println(MESSAGE_ERROR);
             socket.close();
             return;
@@ -162,9 +162,12 @@ class DatabaseNode {
 
         switch (operation){
             case "add-connection":
-                connections.add(sender);
-                res = "Added: "+ sender;
-                out.println(res);
+                if(!connections.toString().contains(sender.toString())){
+                    connections.add(sender);
+                    res = "Added: "+ sender;
+                    out.println(res);
+                }
+                else res = "Already in connections list";
                 break;
             case "set-value":
                 args = parts[1].split(":");
