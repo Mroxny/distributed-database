@@ -77,4 +77,4 @@ This command means execution of a node which holds a value 256 associated with a
 java DatabaseClient -gateway localhost:9991 -operation get-value 17
 ```
 
-This command means execution of a client, which will use the node working on the machine with address localhost and TCP port number 999
+This command means execution of a client, which will use the node working on the machine with address localhost and TCP port number 9991
