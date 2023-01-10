@@ -48,6 +48,8 @@ where:
 
 * `get-value <key> ` get a value associated with the key being the parameter. The result of this operation is a message consisting of the value or an error message
 
+* `find-key <key>` find the address and the port number of a node, which hosts a pair with the key value given as the parameter. If such node exists, the answer is a pair <address>:<port> identifying this node, or the message ERROR if no node has a key with such a value. If the database contains more than 1 such node, only one pair must returned (any valid).
+
 * `get-max` return a max key and value from database, returns error if DB is empty
 
 * `get-min` return a min key and value from database, returns error if DB is empty
