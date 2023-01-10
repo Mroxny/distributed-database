@@ -8,17 +8,26 @@ class DatabaseNode {
     public static String MESSAGE_ERROR = "ERROR";
     public static String MESSAGE_UNKNOWN_COMMAND = "UNKNOWN COMMAND";
 
-
-
+    // The IP address and port of this node
     private IPv4Address serverAddress;
+
+    // The data stored by this node
     private Data data;
+
+    // Flag indicating whether this node is active
     private boolean active;
+
+    // List of connections to other nodes in the database
     private final List<IPv4Address> connections;
+
+    // List of request IDs processed by this node
     private List<Integer> idLog;
+
+    // ServerSocket for accepting client connections over TCP
     private final ServerSocket socketTCP;
 
-
     public DatabaseNode(int port, int key, int value, List<IPv4Address> connections) throws IOException {
+        // Initialize fields
         this.serverAddress = new IPv4Address("localhost", port);
         this.data = new Data(key, value);
         this.active = true;
@@ -26,24 +35,36 @@ class DatabaseNode {
         this.idLog = new ArrayList<>();
         this.socketTCP = new ServerSocket(port);
 
+        // If the port was not specified, use the port assigned by the operating system
         if(serverAddress.getPort() == 0) serverAddress.setPort(socketTCP.getLocalPort());
 
+        // Start listening for client connections in a new thread
         listenForConnections();
 
         printMessage(String.valueOf(serverAddress.getPort()), "Created new node");
 
+        // Send a message to each of the specified connections to add this node to their list of connections
         for(IPv4Address a: connections){
             sendNodeRequest(a, Collections.singletonList(serverAddress), "add-connection",-1);
         }
     }
 
+    /**
+     * Starts a new thread to listen for incoming client and node connections on the specified port.
+     */
     private void listenForConnections() {
-        // Start listening for client connections in a new thread
         new Thread(() -> {
             while (active) {
                 try {
                     Socket newClientSocket = socketTCP.accept();
-                    handleGuests(newClientSocket);
+                    new Thread(()->{
+                        try {
+                            handleGuests(newClientSocket);
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }).start();
+
 
                 } catch (IOException e) {
                     e.printStackTrace();
@@ -53,6 +74,9 @@ class DatabaseNode {
 
     }
 
+    /**
+     * Handles incoming connections, determining if the connection is from a client or another node, and routing it to the appropriate handling method.
+     */
     private void handleGuests(Socket socket) throws IOException {
         BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
         String line = in.readLine();
@@ -64,7 +88,10 @@ class DatabaseNode {
 
     }
 
-    // Handles a client connection
+    /**
+     * Handles incoming connections from a client, processing the client's requested operation and sending a response.
+     * @param line client's requested message
+     */
     private void handleClient(Socket socket, String line) throws IOException {
         PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
 
@@ -133,7 +160,11 @@ class DatabaseNode {
         printMessage(String.valueOf(serverAddress.getPort()), "Client ["+socket.getPort()+"] disconnected");
 
     }
-    // Handles a node connection
+
+    /**
+     * Handles incoming connections from another node in the network.
+     * @param msg array of parts of message from the other nodes
+     */
     private void handleNode(Socket socket, String[] msg) throws IOException {
         PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
 
@@ -320,7 +351,10 @@ class DatabaseNode {
         return MESSAGE_OK;
     }
 
-    // Sends a request to all connections and returns the responses
+    /**
+     * Creates message from params and sends it to target node
+     * @return response from target
+     */
     private String sendNodeRequest(IPv4Address address,List<IPv4Address> owner ,String request, int id){
         printMessage(String.valueOf(serverAddress.getPort()), "Sending \""+request+"\" request to: "+address.getPort());
         String res;
@@ -338,6 +372,11 @@ class DatabaseNode {
         }
     }
 
+    /**
+     * Reads request received from a node
+     * @param res full response from a node
+     * @return String with requested operation
+     */
     private String getMessageFromResponse(String res){
         if(res.contains("node//")){
             String[] parts = res.split("//");
@@ -346,6 +385,10 @@ class DatabaseNode {
         else return res;
     }
 
+    /**
+     * Converts String to List of IPv4Address
+     * @return List of IPv4Address
+     */
     private List<IPv4Address> getTrace(String s){
         s = s.replace("[", "").replace("]", "");
         String[] parts = s.split(", ");
@@ -354,6 +397,11 @@ class DatabaseNode {
         return addresses;
     }
 
+    /**
+     * Finding targets from registered connections
+     * @param sender connection to exclude
+     * @return List of IPv4Address with targets that exclude sender
+     */
     public List<IPv4Address> getTargets(IPv4Address sender){
         List<IPv4Address> list = new ArrayList<>(connections);
         if(sender != null){
