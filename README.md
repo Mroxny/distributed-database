@@ -48,8 +48,6 @@ where:
 
 * `get-value <key> ` get a value associated with the key being the parameter. The result of this operation is a message consisting of the value or an error message
 
-* `get-value <key>` get a value associated with the key being the parameter. The result of this operation is a message consisting of the value or an error message
-
 * `get-max` return a max key and value from database, returns error if DB is empty
 
 * `get-min` return a min key and value from database, returns error if DB is empty
